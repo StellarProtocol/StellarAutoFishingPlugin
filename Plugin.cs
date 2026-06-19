@@ -25,7 +25,6 @@ public sealed partial class Plugin : IStellarPlugin
     private object?     _picInst;
     private MethodInfo? _picFishing;
     private bool        _fishingHeld;
-    private int         _clickRelease;
 
     // Lua direct call — LuaState.DoString(chunk)
     private object?     _luaState;
@@ -203,7 +202,6 @@ public sealed partial class Plugin : IStellarPlugin
             else
                 _services.Log.Warning("[AutoFishing] PlayerFishingSystem.Tick hook failed");
         }
-
     }
 
     private static string StageLabel(int stage) => stage switch

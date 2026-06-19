@@ -35,22 +35,8 @@ internal readonly struct PlayerFishingProxy
     }
 
     internal float QteInputMoveSpeed => ReadFloat(_ptr, _f.QteInputMoveSpeed);
-    internal float QteAutoResetSpeed => ReadFloat(_ptr, _f.QteAutoResetSpeed);
     internal bool  IsFishing         => ReadByte(_ptr, _f.IsFishing) != 0;
     internal int   CurState          => ReadInt(_ptr, _f.CurState);
-    internal float StageTime         => ReadFloat(_ptr, _f.StageTime);
-
-    // Nested IPlayerFishingFloatSystem — read its pointer then its field
-    internal int FishMoveType
-    {
-        get
-        {
-            var floatSysPtr = Marshal.ReadIntPtr(_ptr + _f.FloatSystem);
-            if (floatSysPtr == IntPtr.Zero) return 0;
-            EnsureFloatResolved(Marshal.ReadIntPtr(floatSysPtr));
-            return ReadInt(floatSysPtr, _f.FishMoveType);
-        }
-    }
 
     // Zero lastStageSyncTime_ so the rate-limiter doesn't block stage 5 sync
     internal void ZeroStageSyncTime()
@@ -62,20 +48,15 @@ internal readonly struct PlayerFishingProxy
     // ── Field offset registry ─────────────────────────────────────────────────
 
     private static Fields _f;
-    private static bool _resolved;
-    private static bool _floatResolved;
+    private static bool   _resolved;
 
     private struct Fields
     {
         internal int CurFishingDir;
         internal int QteInputMoveSpeed;
-        internal int QteAutoResetSpeed;
         internal int IsFishing;
         internal int CurState;
-        internal int StageTime;
-        internal int FloatSystem;
         internal int LastStageSyncTime;
-        internal int FishMoveType; // on FloatSystem sub-object
     }
 
     private static void EnsureResolved(IntPtr klass)
@@ -83,21 +64,10 @@ internal readonly struct PlayerFishingProxy
         if (_resolved) return;
         _f.CurFishingDir     = Offset(klass, "curFishingDir");
         _f.QteInputMoveSpeed = Offset(klass, "qteInputMoveSpeed_");
-        _f.QteAutoResetSpeed = Offset(klass, "qteAutoResetSpeed_");
         _f.IsFishing         = Offset(klass, "isFishing_");
         _f.CurState          = Offset(klass, "curState_");
-        _f.StageTime         = Offset(klass, "stageTimeCount_");
-        _f.FloatSystem       = Offset(klass, "playerFishingFloatSystem_");
         _f.LastStageSyncTime = Offset(klass, "lastStageSyncTime_");
-        _f.FishMoveType      = -1; // resolved separately from FloatSystem klass
         _resolved            = true;
-    }
-
-    private static void EnsureFloatResolved(IntPtr floatKlass)
-    {
-        if (_floatResolved) return;
-        _f.FishMoveType = Offset(floatKlass, "fishMoveType_");
-        _floatResolved  = true;
     }
 
     // Ask IL2CPP for the field by name, return its byte offset in the object layout

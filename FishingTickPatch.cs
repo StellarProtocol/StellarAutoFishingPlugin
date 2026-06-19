@@ -9,15 +9,12 @@ internal static class FishingTickPatch
 {
     private const string TargetType = "Panda.ZGame.PlayerFishingSystem";
 
-    internal static bool    IsInstalled          => _harmony != null;
-    internal static object? LastInstance         { get; private set; }
-    internal static float   LastRodTension       { get; private set; }
-    internal static int     LastFishingProgress  { get; private set; }
-    internal static int     LastFishZone         { get; set; } = 2; // E.FishingDirection.Middle=2
+    internal static bool    IsInstalled    => _harmony != null;
+    internal static object? LastInstance   { get; private set; }
+    internal static float   LastRodTension { get; private set; }
+    internal static int     LastFishZone   { get; set; } = 2; // E.FishingDirection.Middle=2
 
-    internal static void ResetTension()   => LastRodTension      = 0f;
-    internal static void ResetProgress()  => LastFishingProgress = 0;
-    internal static void ResetFishZone()  => LastFishZone        = 2;
+    internal static void ResetTension() => LastRodTension = 0f;
 
     private static Harmony?              _harmony;
     private static Action<FishingState>? _onTick;
@@ -45,14 +42,6 @@ internal static class FishingTickPatch
         else
             onLog("[FishingTickPatch] FishingRodTensionChange not found (tension unavailable)");
 
-        var progressMethod = type.GetMethod("FishingProgressChange",
-            BindingFlags.Instance | BindingFlags.Public,
-            null, new[] { typeof(int) }, null);
-        if (progressMethod != null)
-            _harmony.Patch(progressMethod, postfix: new HarmonyMethod(typeof(FishingTickPatch), nameof(ProgressPostfix)));
-        else
-            onLog("[FishingTickPatch] FishingProgressChange not found (progress unavailable)");
-
         onLog("[FishingTickPatch] installed");
         return true;
     }
@@ -75,13 +64,9 @@ internal static class FishingTickPatch
 
             _onTick?.Invoke(new FishingState
             {
-                IsFishing       = fs.Value.IsFishing,
-                Stage           = fs.Value.CurState,
-                TimeLeft        = fs.Value.StageTime,
-                RodDir          = fs.Value.CurFishingDir,
-                FishMoveType    = fs.Value.FishMoveType,
-                RodTension      = LastRodTension,
-                FishingProgress = LastFishingProgress,
+                IsFishing  = fs.Value.IsFishing,
+                Stage      = fs.Value.CurState,
+                RodTension = LastRodTension,
             });
         }
         catch (Exception ex)
@@ -94,8 +79,6 @@ internal static class FishingTickPatch
     {
         LastRodTension = tension;
     }
-
-    private static void ProgressPostfix(int progress) => LastFishingProgress = progress;
 
     private static Type? FindType(string fullName)
     {
@@ -110,15 +93,11 @@ internal static class FishingTickPatch
 
 internal readonly struct FishingState
 {
-    internal bool  IsFishing       { get; init; }
-    internal int   Stage           { get; init; }
-    internal float TimeLeft        { get; init; }
-    internal float RodDir          { get; init; }
-    internal int   FishMoveType    { get; init; }
-    internal float RodTension      { get; init; }
-    internal int   FishingProgress { get; init; }
+    internal bool  IsFishing  { get; init; }
+    internal int   Stage      { get; init; }
+    internal float RodTension { get; init; }
 
-    internal string StageName => Stage switch
+    internal static string StageName(int stage) => stage switch
     {
         0  => "WaitRod",
         1  => "Ready",
@@ -136,13 +115,6 @@ internal readonly struct FishingState
         13 => "FinishShowLoop",
         14 => "FinishShowEnd",
         15 => "Leave",
-        _  => $"Unknown({Stage})",
-    };
-
-    internal string FishMoveName => FishMoveType switch
-    {
-        1 => "Left",
-        2 => "Right",
-        _ => "Middle",
+        _  => $"Unknown({stage})",
     };
 }

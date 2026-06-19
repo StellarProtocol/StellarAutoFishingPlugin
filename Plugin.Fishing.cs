@@ -6,8 +6,6 @@ using Il2CppInterop.Runtime.InteropTypes;
 
 namespace Stellar.AutoFishing;
 
-// Fishing automation — input controller wiring, WorldProxy RPC, stage-enter dispatch, and per-tick
-// rod-steering. Splits the bulk of fishing logic out of Plugin.cs without changing any behaviour.
 public sealed partial class Plugin
 {
     // ── PlayerInputController.Fishing(bool) ──────────────────────────────────
@@ -48,7 +46,7 @@ public sealed partial class Plugin
 
     private void ReleaseFishing()
     {
-        if (_fishingHeld || _clickRelease > 0)
+        if (_fishingHeld)
         {
             // If releasing from the QTE drag phase, also clear Lua IsDraging state
             if (_prevStage == 9 || _prevStage == 10)
@@ -56,8 +54,7 @@ public sealed partial class Plugin
             else
                 CallFishing(false);
         }
-        _fishingHeld  = false;
-        _clickRelease = 0;
+        _fishingHeld = false;
     }
 
     // ── Lua global reader — LuaState["key"] indexer ─────────────────────────────
@@ -244,34 +241,6 @@ public sealed partial class Plugin
         return false;
     }
 
-    private string ReadLuaGlobalStr(string key)
-    {
-        if (_luaState is null || _luaGetGlobal is null) return "?";
-        try
-        {
-            var v = _luaGetGlobal.Invoke(_luaState, new object[] { key });
-            if (v == null) return "nil";
-            if (v is string s) return s;
-            if (v is Il2CppObjectBase il2obj)
-            {
-                var nativePtr = IL2CPP.Il2CppObjectBaseToPtr(il2obj);
-                // IL2CPP System.String — read char data via ToString on the proxy
-                if (nativePtr != IntPtr.Zero)
-                    return il2obj.ToString() ?? "?";
-            }
-            return v.ToString() ?? "?";
-        }
-        catch { return "err"; }
-    }
-
-    // Per-tick variant — no log to avoid spam
-    private void CallLuaSilent(string chunk)
-    {
-        if (_luaState is null || _luaDoString is null) return;
-        try { _luaDoString.Invoke(_luaState, new object[] { chunk, "plugin" }); }
-        catch (Exception ex) { _services.Log.Warning($"[Auto] CallLuaSilent threw: {ex.Message}"); }
-    }
-
     // Mirrors fishing_btn_ctrl_view onDownEvent / onUpEvent for the QTE drag phase.
     // down=true:  DragFishingRod() RPC + SetIsDraging(true) + PlayerInputController:Fishing(true)
     // down=false: SetIsDraging(false) + PlayerInputController:Fishing(false)
@@ -306,12 +275,6 @@ public sealed partial class Plugin
         _fishing = s;
         _window.MarkDirty();
         ++_tickCount;
-
-        if (_clickRelease > 0)
-        {
-            _clickRelease--;
-            if (_clickRelease == 0) { CallFishing(false); _fishingHeld = false; }
-        }
 
         if (!s.IsFishing)
         {
@@ -353,7 +316,7 @@ public sealed partial class Plugin
 
     private void OnStageEnter(int stage)
     {
-        _services.Log.Info($"[Auto] stage → {stage} ({new FishingState { Stage = stage }.StageName})");
+        _services.Log.Info($"[Auto] stage → {stage} ({FishingState.StageName(stage)})");
         EnsurePic();
 
         switch (stage)
@@ -410,7 +373,7 @@ public sealed partial class Plugin
         if (_luaDoString != null && _tickCount % 30 == 0)
         {
             EnsureLuaGlobalReader();
-            CallLuaSilent("pcall(function() local fd=Z.DataMgr.Get('fishing_data') local r=fd and fd.FishingRod local has=(r~=nil and r~=0 and r~='') and 1 or 0 rawset(_G,'_pf_hasrod',has) rawset(_G,'_pf_rod_dbg',tostring(r)) end)");
+            CallLua("pcall(function() local fd=Z.DataMgr.Get('fishing_data') local r=fd and fd.FishingRod local has=(r~=nil and r~=0 and r~='') and 1 or 0 rawset(_G,'_pf_hasrod',has) end)");
             _rodEquipped = ReadLuaGlobalBool("_pf_hasrod");
             _window.MarkDirty();
         }
@@ -436,11 +399,9 @@ public sealed partial class Plugin
                     CallLua("pcall(function() " +
                         "local pkg=Z.ContainerMgr.CharSerialize.itemPackage.packages[1] " +
                         "if not pkg then return end " +
-                        "rawset(_G,'_pf_s',1) " +
                         "local tbl=Z.TableMgr.GetTable('ItemTableMgr') " +
                         "local bestUuid=nil local bestQuality=-1 " +
                         "for _,item in pairs(pkg.items) do " +
-                            "rawset(_G,'_pf_s',2) " +
                             "local cfg=tbl and tbl.GetRow(item.configId) " +
                             "if cfg and cfg.Type==1103 then " +
                                 "local q=cfg.Quality or 0 " +
@@ -448,7 +409,6 @@ public sealed partial class Plugin
                             "end " +
                         "end " +
                         "if bestUuid then " +
-                            "rawset(_G,'_pf_s',3) " +
                             "local fvm=Z.VMMgr.GetVM('fishing') " +
                             "local cs=Z.CancelSource.Rent() " +
                             "if fvm then fvm.SetFishingRodAsync(bestUuid,cs:CreateToken()) end " +
@@ -493,7 +453,7 @@ public sealed partial class Plugin
                 // which get_Item returns as Double (not Il2CppSystem.Object).
                 EnsureLuaState();
                 EnsureLuaGlobalReader();
-                CallLuaSilent("pcall(function() local fd=Z.DataMgr.Get('fishing_data') if not fd then return end local tf=fd.TargetFish if not tf then return end local d=tf.dir local E_dir=E.FishingDirection local z=2 if d==E_dir.Left then z=1 elseif d==E_dir.Right then z=3 end rawset(_G,'_pf_zone',z) if d and d~=0 then fd.QTEData.playerSwingDir_=d end end)");
+                CallLua("pcall(function() local fd=Z.DataMgr.Get('fishing_data') if not fd then return end local tf=fd.TargetFish if not tf then return end local d=tf.dir local E_dir=E.FishingDirection local z=2 if d==E_dir.Left then z=1 elseif d==E_dir.Right then z=3 end rawset(_G,'_pf_zone',z) if d and d~=0 then fd.QTEData.playerSwingDir_=d end end)");
                 FishingTickPatch.LastFishZone = ReadLuaGlobalInt("_pf_zone");
                 if (PlayerFishingProxy.From(FishingTickPatch.LastInstance) is { } fs)
                 {
