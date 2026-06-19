@@ -50,8 +50,14 @@ public sealed partial class Plugin : IStellarPlugin
     // Offset of m_value in IL2CPP boxed primitive (resolved once from klass)
     private int _luaBoxedValueOff = -1;
 
-    private bool _autoEnabled;
-    private bool _autoRodChange = true;
+    private bool  _autoEnabled;
+    private bool  _autoRodChange = true;
+
+    // Monthly-card interrupt: pause automation, close the popup, restart after 1.5 s
+    private bool  _monthlyCardInterrupt = true;
+    private float _monthlyCheckAccum;
+    private bool  _monthlyRestartPending;
+    private float _monthlyRestartTimer;
 
     private float _tensionHigh = 25f;
     private float _tensionLow  = 8f;
@@ -64,9 +70,10 @@ public sealed partial class Plugin : IStellarPlugin
     {
         _services = services;
         _cfg = _services.Config.GetSection("settings");
-        _autoRodChange = _cfg.Get<bool> ("auto_rod_change", true);
-        _tensionHigh   = _cfg.Get<float>("tension_high",    25f);
-        _tensionLow    = _cfg.Get<float>("tension_low",     8f);
+        _autoRodChange       = _cfg.Get<bool> ("auto_rod_change",        true);
+        _monthlyCardInterrupt = _cfg.Get<bool> ("monthly_card_interrupt", true);
+        _tensionHigh          = _cfg.Get<float>("tension_high",           25f);
+        _tensionLow           = _cfg.Get<float>("tension_low",            8f);
         _services.Log.Info("[AutoFishing] constructed");
 
         _window = _services.Windows.Register(new WindowRegistration(
@@ -121,6 +128,17 @@ public sealed partial class Plugin : IStellarPlugin
                 }, Gap: 6f),
                 new TextElement(
                     () => "Auto-equip the best rod from bag. If off, automation waits until you equip one manually.",
+                    Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+                new RowElement(new HudElement[]
+                {
+                    new ToggleElement(
+                        Label: () => "",
+                        Get:   () => _monthlyCardInterrupt,
+                        Set:   v  => { _monthlyCardInterrupt = v; _cfg.Set<bool>("monthly_card_interrupt", v); _cfg.Save(); }),
+                    new TextElement(() => "Monthly Card Interrupt"),
+                }, Gap: 6f),
+                new TextElement(
+                    () => "Auto-close the daily login card popup and resume fishing.",
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                 new SeparatorElement(),
                 new TextElement(() => "Tension Control", Emphasis: true),

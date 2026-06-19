@@ -262,6 +262,7 @@ public sealed partial class Plugin
         {
             ReleaseFishing();
             _prevStage = -1;
+            _monthlyRestartPending = false;
         }
         _services.Log.Info($"[Auto] automation {(_autoEnabled ? "started" : "stopped")}");
         _window.MarkDirty();
@@ -283,10 +284,29 @@ public sealed partial class Plugin
                 else { ReleaseFishing(); _prevStage = -1; }
                 _rodEquipped = false;
             }
+            _monthlyRestartPending = false;
+            return;
+        }
+
+        // Pending restart after monthly card was closed — runs even while !_autoEnabled
+        if (_monthlyRestartPending)
+        {
+            _monthlyRestartTimer += GetDeltaTime();
+            if (_monthlyRestartTimer >= 1.5f)
+            {
+                _monthlyRestartPending = false;
+                _autoEnabled = true;
+                _prevStage = -1;
+                _services.Log.Info("[Auto] monthly card closed — automation restarted");
+                _window.MarkDirty();
+            }
             return;
         }
 
         if (!_autoEnabled) return;
+
+        if (_monthlyCardInterrupt) CheckMonthlyCardInterrupt();
+        if (!_autoEnabled) return; // monthly card interrupt may have paused us
 
         if (s.Stage != _prevStage)
         {
@@ -310,6 +330,27 @@ public sealed partial class Plugin
         }
 
         UpdateAutomation(s);
+    }
+
+    private void CheckMonthlyCardInterrupt()
+    {
+        _monthlyCheckAccum += GetDeltaTime();
+        if (_monthlyCheckAccum < 0.5f) return;
+        _monthlyCheckAccum = 0f;
+
+        EnsureLuaState();
+        EnsureLuaGlobalReader();
+        CallLua("pcall(function() local a=(Z.UIMgr):IsActive('monthly_reward_card_window') local b=(Z.UIMgr):IsActive('com_rewards_window') rawset(_G,'_pf_monthly',(a or b) and 1 or 0) end)");
+        if (!ReadLuaGlobalBool("_pf_monthly")) return;
+
+        _services.Log.Info("[Auto] monthly card / item reward window detected — pausing automation");
+        ReleaseFishing();
+        _autoEnabled = false;
+        _prevStage = -1;
+        CallLua("pcall(function() if (Z.UIMgr):IsActive('monthly_reward_card_window') then (Z.UIMgr):CloseView('monthly_reward_card_window') end if (Z.UIMgr):IsActive('com_rewards_window') then (Z.UIMgr):CloseView('com_rewards_window') end end)");
+        _monthlyRestartPending = true;
+        _monthlyRestartTimer = 0f;
+        _window.MarkDirty();
     }
 
     private void OnStageEnter(int stage)
