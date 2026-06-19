@@ -261,7 +261,6 @@ public sealed partial class Plugin
         if (!_autoEnabled)
         {
             ReleaseFishing();
-            InputSimPatch.ClearAll();
             _prevStage = -1;
         }
         _services.Log.Info($"[Auto] automation {(_autoEnabled ? "started" : "stopped")}");
@@ -281,7 +280,7 @@ public sealed partial class Plugin
             if (_prevStage != -1)
             {
                 if (_autoEnabled) ToggleAuto();
-                else { ReleaseFishing(); InputSimPatch.ClearAll(); _prevStage = -1; }
+                else { ReleaseFishing(); _prevStage = -1; }
                 _rodEquipped = false;
             }
             return;
@@ -305,7 +304,6 @@ public sealed partial class Plugin
             if (!isControlCycle)
             {
                 ReleaseFishing();
-                InputSimPatch.ClearAll();
             }
             _prevStage = s.Stage;
             OnStageEnter(s.Stage);

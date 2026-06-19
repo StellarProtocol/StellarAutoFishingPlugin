@@ -171,8 +171,6 @@ public sealed partial class Plugin : IStellarPlugin
             OnOpen:  () => _window.SetVisible(true))
         { Group = LauncherGroup.Plugin });
 
-        InputSimPatch.Install(HarmonyId, _services.Log.Info);
-
         _services.ClientState.Login += OnLogin;
 
         if (FishingTickPatch.Install(HarmonyId, OnFishingTick, _services.Log.Info))
@@ -184,7 +182,6 @@ public sealed partial class Plugin : IStellarPlugin
     public void Dispose()
     {
         ReleaseFishing();
-        InputSimPatch.Uninstall();
         FishingTickPatch.Uninstall();
         _services.ClientState.Login -= OnLogin;
         _launcherEntry.Dispose();
