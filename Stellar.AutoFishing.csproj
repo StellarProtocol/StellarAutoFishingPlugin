@@ -16,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources/fishing-icon.png" LogicalName="Stellar.AutoFishing.fishing-icon.png" />
+    <EmbeddedResource Include="resources/fishing-icon.png" LogicalName="Stellar.AutoFishing.fishing-icon.png" />
   </ItemGroup>
 
   <ItemGroup>
