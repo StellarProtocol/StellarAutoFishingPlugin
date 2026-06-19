@@ -1,6 +1,6 @@
 # StellarAutoFishingPlugin
 
-A [Stellar Framework](https://github.com/) plugin for **Blue Protocol Star Resonance** that fully automates the fishing minigame — from equipping a rod to reeling in the catch — so you can leave it running unattended.
+A [Stellar Framework](https://github.com/) plugin that fully automates the fishing minigame — from equipping a rod to reeling in the catch — so you can leave it running unattended.
 
 ## Features
 
@@ -12,7 +12,6 @@ A [Stellar Framework](https://github.com/) plugin for **Blue Protocol Star Reson
 
 ## Requirements
 
-- Blue Protocol Star Resonance (`release_2.11` or compatible)
 - [Stellar Framework](https://github.com/) installed in the game directory
 
 ## Installation
