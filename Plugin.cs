@@ -84,8 +84,8 @@ public sealed partial class Plugin : IStellarPlugin
                 Category:    WindowCategory.Tools,
                 Style:       WindowPanelStyle.GlassMenu)
             { Draggable = true, Closable = true, StartVisible = false,
-              // Gameplay tool: draw only while in-world (fishing happens in the World phase).
-              ShouldRender = () => _services.ClientState.Phase == GamePhase.World },
+              // Gameplay tool: draw only while in-world (fishing happens in the World phase), hidden during loading screens.
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
             Root: new ColumnElement(new HudElement[]
             {
                 new ConditionalElement(
