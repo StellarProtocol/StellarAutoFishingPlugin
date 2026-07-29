@@ -83,7 +83,9 @@ public sealed partial class Plugin : IStellarPlugin
                 DefaultRect: new WindowRect(_services.Framework.ScreenWidth - 300f, 20f, 280f, 0f),
                 Category:    WindowCategory.Tools,
                 Style:       WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false },
+            { Draggable = true, Closable = true, StartVisible = false,
+              // Gameplay tool: draw only while in-world (fishing happens in the World phase).
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World },
             Root: new ColumnElement(new HudElement[]
             {
                 new ConditionalElement(
