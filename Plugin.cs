@@ -189,7 +189,9 @@ public sealed partial class Plugin : IStellarPlugin
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
-        { Group = LauncherGroup.Plugin });
+        { Group = LauncherGroup.Plugin,
+          // In-world tool: only surface the launcher tile in the World phase.
+          ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
 
         _services.ClientState.Login += OnLogin;
 
