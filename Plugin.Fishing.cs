@@ -1,8 +1,6 @@
 using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using Il2CppInterop.Runtime;
-using Il2CppInterop.Runtime.InteropTypes;
+using Stellar.Abstractions.Services;
 
 namespace Stellar.AutoFishing;
 
@@ -14,24 +12,15 @@ public sealed partial class Plugin
     {
         if (_picFishing != null && _picInst != null) return;
 
-        var type = FindType("Panda.ZInput.PlayerInputController");
+        var type = StellarInterop.FindType("Panda.ZInput.PlayerInputController");
         if (type is null) { _services.Log.Warning("[Auto] PlayerInputController type not found"); return; }
 
+        // Matched by parameter TYPE (bool) — kept as a type-constrained GetMethod, not FindMethod.
         _picFishing ??= type.GetMethod("Fishing", BindingFlags.Public | BindingFlags.Instance,
                             null, new[] { typeof(bool) }, null);
 
-        if (_picInst is null)
-        {
-            // FlattenHierarchy: Instance is inherited from ZSingleton<T>, not declared on PlayerInputController
-            var prop = type.GetProperty("Instance",
-                BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
-            if (prop is null)
-            {
-                var baseType = type.BaseType;
-                prop = baseType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
-            }
-            _picInst = prop?.GetValue(null);
-        }
+        // Instance is inherited from ZSingleton<T> (FlattenHierarchy) — GetSingleton walks the base chain.
+        _picInst ??= StellarInterop.GetSingleton(type);
     }
 
     private void CallFishing(bool pressed)
@@ -57,73 +46,11 @@ public sealed partial class Plugin
         _fishingHeld = false;
     }
 
-    // ── Lua global reader — LuaState["key"] indexer ─────────────────────────────
-
-    private MethodInfo? _luaGetGlobal;
-
-    private void EnsureLuaGlobalReader()
-    {
-        if (_luaGetGlobal != null || _luaState is null) return;
-        var t = _luaState.GetType();
-        // Search by name only — IL2CPP proxy may use Il2CppSystem.String not System.String,
-        // so exact type-constrained GetMethod("GetNumber", null, new[]{typeof(string)}, null) fails.
-        // Tolua# exposes: GetNumber, get_Item (indexer), GetString, GetBoolean — try each.
-        foreach (var candidate in new[] { "GetNumber", "get_Item", "GetString", "GetFloat" })
-        {
-            foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (m.Name != candidate || m.IsGenericMethod) continue;
-                var ps = m.GetParameters();
-                if (ps.Length != 1) continue;
-                _luaGetGlobal = m;
-                return;
-            }
-        }
-    }
-
-    private int ReadLuaGlobalInt(string key)
-    {
-        if (_luaState is null || _luaGetGlobal is null) return 2;
-        try
-        {
-            var v = _luaGetGlobal.Invoke(_luaState, new object[] { key });
-            if (v == null) return 2;
-
-            // Managed numeric types (standard tolua#)
-            if (v is double d)  return (int)d is 0 ? 2 : (int)d;
-            if (v is float  f)  return (int)f is 0 ? 2 : (int)f;
-            if (v is int    i)  return i == 0 ? 2 : i;
-            if (v is long   l)  return (int)l == 0 ? 2 : (int)l;
-            // String path: if Lua stored tostring(z)
-            if (v is string s && int.TryParse(s, out int si)) return si == 0 ? 2 : si;
-
-            // IL2CPP tolua# always returns Il2CppSystem.Object — unwrap boxed primitive via IL2CPP field API.
-            if (v is Il2CppObjectBase il2obj)
-            {
-                var nativePtr = IL2CPP.Il2CppObjectBaseToPtr(il2obj);
-                if (nativePtr != IntPtr.Zero)
-                {
-                    EnsureBoxedValueOffset(nativePtr);
-                    // Try as double first (Lua numbers are double in Lua 5.1/5.3)
-                    double dv = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(nativePtr + _luaBoxedValueOff));
-                    if (dv >= 1.0 && dv <= 3.0 && dv == System.Math.Floor(dv))
-                        return (int)dv;
-                    // Try as int32 (IL2CPP integer enum)
-                    int iv = Marshal.ReadInt32(nativePtr + _luaBoxedValueOff);
-                    if (iv >= 1 && iv <= 3)
-                        return iv;
-                }
-            }
-        }
-        catch { }
-        return 2;
-    }
-
     // ── Unity Time.deltaTime ─────────────────────────────────────────────────────
 
     private float GetDeltaTime()
     {
-        _unityTimeDeltaTime ??= FindType("UnityEngine.Time")
+        _unityTimeDeltaTime ??= StellarInterop.FindType("UnityEngine.Time")
             ?.GetProperty("deltaTime", BindingFlags.Public | BindingFlags.Static);
         if (_unityTimeDeltaTime != null)
         {
@@ -132,125 +59,15 @@ public sealed partial class Plugin
         return 1f / 30f; // fallback: assume 30 fps
     }
 
-    // ── Lua direct call — LuaState.DoString ──────────────────────────────────────
-
-    private void EnsureLuaState()
-    {
-        if (_luaDoString != null) return;
-
-        // Always use LuaInterface.LuaState.mainState — the Stellar Framework's own Lua bridge
-        // uses this path ("via tolua# LuaState.mainState + DoString"). LuaClient.Instance.luaState
-        // may be a different state where Z.DataMgr and other game globals are not registered.
-        var lsType = FindType("LuaInterface.LuaState");
-        if (lsType != null)
-        {
-            _luaState =
-                lsType.GetProperty("mainState", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(null)
-                ?? lsType.GetField("mainState",  BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(null);
-        }
-
-        // Fallback: LuaClient.Instance.luaState
-        if (_luaState is null)
-        {
-            var clientType = FindType("LuaClient");
-            var clientInst = clientType
-                ?.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
-                ?.GetValue(null);
-            if (clientInst != null)
-            {
-                var t = clientInst.GetType();
-                _luaState =
-                    t.GetProperty("luaState", BindingFlags.Instance | BindingFlags.Public)?.GetValue(clientInst)
-                    ?? t.GetField("luaState", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(clientInst);
-            }
-        }
-
-        if (_luaState is null) { _services.Log.Warning("[Auto] LuaState not found via any path"); return; }
-
-        foreach (var m in _luaState.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
-        {
-            if (m.Name != "DoString" || m.IsGenericMethod) continue;
-            var ps = m.GetParameters();
-            if (ps.Length < 2 || ps[0].ParameterType != typeof(string)) continue;
-            if (m.ReturnType == typeof(void))
-                _luaDoString ??= m;
-        }
-
-        // Verify we're on the game's main Lua state by probing well-known globals.
-        // Also find set_Item so we can write globals from C# instead of DoString.
-        if (_luaGetGlobal is null)
-        {
-            foreach (var m in _luaState.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (m.Name != "get_Item" || m.IsGenericMethod) continue;
-                var ps = m.GetParameters();
-                if (ps.Length != 1) continue;
-                _luaGetGlobal = m;
-                break;
-            }
-        }
-    }
-
-    private void CallLua(string chunk)
-    {
-        if (_luaState is null || _luaDoString is null) return;
-        try
-        {
-            _luaDoString.Invoke(_luaState, new object[] { chunk, "plugin" });
-        }
-        catch (Exception ex) { _services.Log.Warning($"[Auto] CallLua threw: {ex.Message}"); }
-    }
-
-    private void EnsureBoxedValueOffset(IntPtr nativePtr)
-    {
-        if (_luaBoxedValueOff >= 0) return;
-        var klass = Marshal.ReadIntPtr(nativePtr); // klass* always at offset 0
-        var field = klass != IntPtr.Zero
-            ? IL2CPP.il2cpp_class_get_field_from_name(klass, "m_value")
-            : IntPtr.Zero;
-        _luaBoxedValueOff = field != IntPtr.Zero
-            ? (int)IL2CPP.il2cpp_field_get_offset(field)
-            : 0x10; // universal fallback
-    }
-
-    private bool ReadLuaGlobalBool(string key)
-    {
-        if (_luaState is null || _luaGetGlobal is null) return false;
-        try
-        {
-            var v = _luaGetGlobal.Invoke(_luaState, new object[] { key });
-            if (v == null)       return false;
-            if (v is bool   b)   return b;
-            if (v is double d)   return d != 0.0;
-            if (v is float  f)   return f != 0f;
-            if (v is int    i)   return i != 0;
-            if (v is long   l)   return l != 0;
-            if (v is Il2CppObjectBase il2obj)
-            {
-                var nativePtr = IL2CPP.Il2CppObjectBaseToPtr(il2obj);
-                if (nativePtr != IntPtr.Zero)
-                {
-                    EnsureBoxedValueOffset(nativePtr);
-                    // Stored as Lua number (1/0) — read as double for exact match
-                    double dv = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(nativePtr + _luaBoxedValueOff));
-                    return dv != 0.0;
-                }
-            }
-        }
-        catch { }
-        return false;
-    }
-
     // Mirrors fishing_btn_ctrl_view onDownEvent / onUpEvent for the QTE drag phase.
     // down=true:  DragFishingRod() RPC + SetIsDraging(true) + PlayerInputController:Fishing(true)
     // down=false: SetIsDraging(false) + PlayerInputController:Fishing(false)
     private void CallLuaDrag(bool down)
     {
-        EnsureLuaState();
         string chunk = down
             ? "pcall(function() local vm=Z.VMMgr.GetVM('fishing') if vm then vm.DragFishingRod() end local fd=Z.DataMgr.Get('fishing_data') if fd then fd:SetIsDraging(true) end Z.PlayerInputController:Fishing(true) end)"
             : "pcall(function() local fd=Z.DataMgr.Get('fishing_data') if fd then fd:SetIsDraging(false) end Z.PlayerInputController:Fishing(false) end)";
-        CallLua(chunk);
+        _services.Lua.DoString(chunk);
     }
 
     // ── Automation toggle ────────────────────────────────────────────────────
@@ -338,16 +155,15 @@ public sealed partial class Plugin
         if (_monthlyCheckAccum < 0.5f) return;
         _monthlyCheckAccum = 0f;
 
-        EnsureLuaState();
-        EnsureLuaGlobalReader();
-        CallLua("pcall(function() local a=(Z.UIMgr):IsActive('monthly_reward_card_window') local b=(Z.UIMgr):IsActive('com_rewards_window') rawset(_G,'_pf_monthly',(a or b) and 1 or 0) end)");
-        if (!ReadLuaGlobalBool("_pf_monthly")) return;
+        // Store the sentinel as a real Lua boolean (true/nil) so TryReadGlobalBool (type-strict) reads it.
+        _services.Lua.DoString("pcall(function() local a=(Z.UIMgr):IsActive('monthly_reward_card_window') local b=(Z.UIMgr):IsActive('com_rewards_window') rawset(_G,'_pf_monthly',(a or b) and true or nil) end)");
+        if (!(_services.Lua.TryReadGlobalBool("_pf_monthly", out var monthlyActive) && monthlyActive)) return;
 
         _services.Log.Info("[Auto] monthly card / item reward window detected — pausing automation");
         ReleaseFishing();
         _autoEnabled = false;
         _prevStage = -1;
-        CallLua("pcall(function() if (Z.UIMgr):IsActive('monthly_reward_card_window') then (Z.UIMgr):CloseView('monthly_reward_card_window') end if (Z.UIMgr):IsActive('com_rewards_window') then (Z.UIMgr):CloseView('com_rewards_window') end end)");
+        _services.Lua.DoString("pcall(function() if (Z.UIMgr):IsActive('monthly_reward_card_window') then (Z.UIMgr):CloseView('monthly_reward_card_window') end if (Z.UIMgr):IsActive('com_rewards_window') then (Z.UIMgr):CloseView('com_rewards_window') end end)");
         _monthlyRestartPending = true;
         _monthlyRestartTimer = 0f;
         _window.MarkDirty();
@@ -364,13 +180,11 @@ public sealed partial class Plugin
                 _rodSelectorTimer = 0f;
                 _rodSelectorFired = false;
                 _rodUseFired      = false;
-                EnsureLuaState();
                 break;
 
             case 1:  // Ready — start 2s delay before casting
                 _castDelayTimer = 0f;
                 _castFired      = false;
-                EnsureLuaState();
                 break;
 
             case 4:  // BiteHook — hold button so native updateBiteHook fires when bite window opens
@@ -379,8 +193,7 @@ public sealed partial class Plugin
                 break;
 
             case 5:  // WaitHarvesting — native changeFishingStage(5) just fired confirming bite
-                EnsureLuaState();
-                CallLua("pcall(function() local vm = Z.VMMgr.GetVM('fishing') if vm ~= nil then vm.HarvestingFishingRod() end end)");
+                _services.Lua.DoString("pcall(function() local vm = Z.VMMgr.GetVM('fishing') if vm ~= nil then vm.HarvestingFishingRod() end end)");
                 break;
 
             case 8:  // Hit — start drag early so we never miss the Control window
@@ -409,11 +222,10 @@ public sealed partial class Plugin
     private void UpdateAutomation(FishingState s)
     {
         // Keep rod-equipped status current throughout all fishing stages
-        if (_luaDoString != null && _tickCount % 30 == 0)
+        if (_services.Lua.Ready && _tickCount % 30 == 0)
         {
-            EnsureLuaGlobalReader();
-            CallLua("pcall(function() local fd=Z.DataMgr.Get('fishing_data') local r=fd and fd.FishingRod local has=(r~=nil and r~=0 and r~='') and 1 or 0 rawset(_G,'_pf_hasrod',has) end)");
-            _rodEquipped = ReadLuaGlobalBool("_pf_hasrod");
+            _services.Lua.DoString("pcall(function() local fd=Z.DataMgr.Get('fishing_data') local r=fd and fd.FishingRod local has=(r~=nil and r~=0 and r~='') and true or nil rawset(_G,'_pf_hasrod',has) end)");
+            _rodEquipped = _services.Lua.TryReadGlobalBool("_pf_hasrod", out var hasRod) && hasRod;
             _window.MarkDirty();
         }
 
@@ -425,7 +237,7 @@ public sealed partial class Plugin
                 if (!_rodSelectorFired && _rodSelectorTimer >= 1f)
                 {
                     _rodSelectorFired = true;
-                    CallLua("pcall(function() local v=Z.UIMgr:GetView('fishing_main_window') if v then v:showItemSelectView(1103) end end)");
+                    _services.Lua.DoString("pcall(function() local v=Z.UIMgr:GetView('fishing_main_window') if v then v:showItemSelectView(1103) end end)");
                 }
                 if (_rodSelectorFired && !_rodUseFired && _rodSelectorTimer >= 2.5f)
                 {
@@ -435,7 +247,7 @@ public sealed partial class Plugin
                     // Access Z.ContainerMgr.CharSerialize.itemPackage.packages[1] directly —
                     // avoid nested pcalls which return IL2CPP booleans (always truthy in Lua).
                     // _pf_s tracks progress as a Lua number: 1=pkg, 2=loop, 3=rod found+set
-                    CallLua("pcall(function() " +
+                    _services.Lua.DoString("pcall(function() " +
                         "local pkg=Z.ContainerMgr.CharSerialize.itemPackage.packages[1] " +
                         "if not pkg then return end " +
                         "local tbl=Z.TableMgr.GetTable('ItemTableMgr') " +
@@ -466,7 +278,7 @@ public sealed partial class Plugin
                     {
                         _castFired = true;
                         if (_rodEquipped)
-                            CallLua("pcall(function() local vm=Z.VMMgr.GetVM('fishing') if vm~=nil then vm.ThrowFishingRod() end end)");
+                            _services.Lua.DoString("pcall(function() local vm=Z.VMMgr.GetVM('fishing') if vm~=nil then vm.ThrowFishingRod() end end)");
                         else
                             _services.Log.Warning("[Auto] Stage 1: no rod equipped — skipping cast");
                     }
@@ -488,12 +300,12 @@ public sealed partial class Plugin
             case 9:
             case 10:
                 // rawset bypasses __newindex on _G; compare against E.FishingDirection
-                // constants in Lua so _pf_zone is always a plain Lua integer (1/2/3),
-                // which get_Item returns as Double (not Il2CppSystem.Object).
-                EnsureLuaState();
-                EnsureLuaGlobalReader();
-                CallLua("pcall(function() local fd=Z.DataMgr.Get('fishing_data') if not fd then return end local tf=fd.TargetFish if not tf then return end local d=tf.dir local E_dir=E.FishingDirection local z=2 if d==E_dir.Left then z=1 elseif d==E_dir.Right then z=3 end rawset(_G,'_pf_zone',z) if d and d~=0 then fd.QTEData.playerSwingDir_=d end end)");
-                FishingTickPatch.LastFishZone = ReadLuaGlobalInt("_pf_zone");
+                // constants in Lua so _pf_zone is always a plain Lua number (1/2/3),
+                // which the type-strict TryReadGlobalNumber reads back cleanly.
+                _services.Lua.DoString("pcall(function() local fd=Z.DataMgr.Get('fishing_data') if not fd then return end local tf=fd.TargetFish if not tf then return end local d=tf.dir local E_dir=E.FishingDirection local z=2 if d==E_dir.Left then z=1 elseif d==E_dir.Right then z=3 end rawset(_G,'_pf_zone',z) if d and d~=0 then fd.QTEData.playerSwingDir_=d end end)");
+                // _pf_zone is a plain Lua number (1/2/3); default to 2 (Middle) on miss or 0, matching the old reader.
+                FishingTickPatch.LastFishZone =
+                    _services.Lua.TryReadGlobalNumber("_pf_zone", out var zone) && (int)zone != 0 ? (int)zone : 2;
                 if (PlayerFishingProxy.From(FishingTickPatch.LastInstance) is { } fs)
                 {
                     float target = FishingTickPatch.LastFishZone switch { 1 => -1f, 3 => 1f, _ => 0f };
@@ -526,8 +338,7 @@ public sealed partial class Plugin
                     if (_finishDelayTimer >= 5f)
                     {
                         _finishClicked = true;
-                        EnsureLuaState();
-                        CallLua("pcall(function() local vm=Z.VMMgr.GetVM('fishing') if not vm then return end vm.EnterFishingState() Z.AudioMgr:PlayBGM('BGM_Sys_Fishing_None') Z.AudioMgr:PlayBGM('UnMuteAll_BGM') Z.UIMgr:CloseView('fishing_obtain_window') vm.FishingSuccessShowEnd() end)");
+                        _services.Lua.DoString("pcall(function() local vm=Z.VMMgr.GetVM('fishing') if not vm then return end vm.EnterFishingState() Z.AudioMgr:PlayBGM('BGM_Sys_Fishing_None') Z.AudioMgr:PlayBGM('UnMuteAll_BGM') Z.UIMgr:CloseView('fishing_obtain_window') vm.FishingSuccessShowEnd() end)");
                     }
                 }
                 break;

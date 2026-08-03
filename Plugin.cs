@@ -10,8 +10,6 @@ public sealed partial class Plugin : IStellarPlugin
 {
     public string Name => "AutoFishing";
 
-    private const string HarmonyId = "stellar.auto-fishing-plugin";
-
     private readonly IPluginServices  _services;
     private readonly IConfigSection  _cfg;
     private readonly IWindowControl  _window;
@@ -25,10 +23,6 @@ public sealed partial class Plugin : IStellarPlugin
     private object?     _picInst;
     private MethodInfo? _picFishing;
     private bool        _fishingHeld;
-
-    // Lua direct call — LuaState.DoString(chunk)
-    private object?     _luaState;
-    private MethodInfo? _luaDoString;
 
     // UnityEngine.Time.deltaTime — cached for per-tick rod steering
     private PropertyInfo? _unityTimeDeltaTime;
@@ -46,9 +40,6 @@ public sealed partial class Plugin : IStellarPlugin
     // Stage 13 (FinishShowLoop) auto-continue
     private float _finishDelayTimer;
     private bool  _finishClicked;
-
-    // Offset of m_value in IL2CPP boxed primitive (resolved once from klass)
-    private int _luaBoxedValueOff = -1;
 
     private bool  _autoEnabled;
     private bool  _autoRodChange = true;
@@ -195,7 +186,7 @@ public sealed partial class Plugin : IStellarPlugin
 
         _services.ClientState.Login += OnLogin;
 
-        if (FishingTickPatch.Install(HarmonyId, OnFishingTick, _services.Log.Info))
+        if (FishingTickPatch.Install(_services.Harmony.Create(), OnFishingTick, _services.Log.Info))
             _services.Log.Info("[AutoFishing] PlayerFishingSystem.Tick hooked");
         else
             _services.Log.Warning("[AutoFishing] PlayerFishingSystem.Tick hook failed — will retry on login");
@@ -216,7 +207,7 @@ public sealed partial class Plugin : IStellarPlugin
 
         if (!FishingTickPatch.IsInstalled)
         {
-            if (FishingTickPatch.Install(HarmonyId, OnFishingTick, _services.Log.Info))
+            if (FishingTickPatch.Install(_services.Harmony.Create(), OnFishingTick, _services.Log.Info))
                 _services.Log.Info("[AutoFishing] PlayerFishingSystem.Tick hooked (deferred)");
             else
                 _services.Log.Warning("[AutoFishing] PlayerFishingSystem.Tick hook failed");
@@ -262,15 +253,5 @@ public sealed partial class Plugin : IStellarPlugin
             return ms.ToArray();
         }
         catch { return null; }
-    }
-
-    private static Type? FindType(string fullName)
-    {
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var t = asm.GetType(fullName);
-            if (t is not null) return t;
-        }
-        return null;
     }
 }

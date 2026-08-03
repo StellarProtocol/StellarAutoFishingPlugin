@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes;
+using Stellar.Abstractions.Services;
 
 namespace Stellar.AutoFishing;
 
@@ -9,49 +10,52 @@ internal static class FishingTickPatch
 {
     private const string TargetType = "Panda.ZGame.PlayerFishingSystem";
 
-    internal static bool    IsInstalled    => _harmony != null;
+    internal static bool    IsInstalled    => _installed;
     internal static object? LastInstance   { get; private set; }
     internal static float   LastRodTension { get; private set; }
     internal static int     LastFishZone   { get; set; } = 2; // E.FishingDirection.Middle=2
 
     internal static void ResetTension() => LastRodTension = 0f;
 
-    private static Harmony?              _harmony;
+    private static bool                  _installed;
     private static Action<FishingState>? _onTick;
     private static Action<string>?       _onLog;
 
-    internal static bool Install(string harmonyId, Action<FishingState> onTick, Action<string> onLog)
+    internal static bool Install(Harmony harmony, Action<FishingState> onTick, Action<string> onLog)
     {
         _onLog = onLog;
 
-        var type = FindType(TargetType);
+        var type = StellarInterop.FindType(TargetType);
         if (type is null) { onLog("[FishingTickPatch] PlayerFishingSystem type not found"); return false; }
 
         var tick = type.GetMethod("Tick", BindingFlags.Instance | BindingFlags.Public);
         if (tick is null) { onLog("[FishingTickPatch] Tick method not found"); return false; }
 
         _onTick  = onTick;
-        _harmony = new Harmony(harmonyId);
-        _harmony.Patch(tick, postfix: new HarmonyMethod(typeof(FishingTickPatch), nameof(Postfix)));
+        harmony.Patch(tick, postfix: new HarmonyMethod(typeof(FishingTickPatch), nameof(Postfix)));
 
+        // Matched by parameter TYPE (float), not just arity — kept as a type-constrained GetMethod
+        // rather than StellarInterop.FindMethod (which matches name + count only).
         var tensionMethod = type.GetMethod("FishingRodTensionChange",
             BindingFlags.Instance | BindingFlags.Public,
             null, new[] { typeof(float) }, null);
         if (tensionMethod != null)
-            _harmony.Patch(tensionMethod, postfix: new HarmonyMethod(typeof(FishingTickPatch), nameof(TensionPostfix)));
+            harmony.Patch(tensionMethod, postfix: new HarmonyMethod(typeof(FishingTickPatch), nameof(TensionPostfix)));
         else
             onLog("[FishingTickPatch] FishingRodTensionChange not found (tension unavailable)");
 
+        _installed = true;
         onLog("[FishingTickPatch] installed");
         return true;
     }
 
     internal static void Uninstall()
     {
-        _harmony?.UnpatchSelf();
-        _harmony = null;
-        _onTick  = null;
-        _onLog   = null;
+        // Harmony teardown is owned by IHarmonyHost, which auto-unpatches every instance on plugin
+        // dispose — so we must NOT unpatch here (that would double-unpatch). Only reset transient state.
+        _installed = false;
+        _onTick    = null;
+        _onLog     = null;
     }
 
     private static void Postfix(Il2CppObjectBase __instance)
@@ -78,16 +82,6 @@ internal static class FishingTickPatch
     private static void TensionPostfix(float tension)
     {
         LastRodTension = tension;
-    }
-
-    private static Type? FindType(string fullName)
-    {
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var t = asm.GetType(fullName);
-            if (t is not null) return t;
-        }
-        return null;
     }
 }
 
