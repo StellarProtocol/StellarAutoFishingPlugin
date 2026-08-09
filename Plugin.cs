@@ -10,8 +10,6 @@ public sealed partial class Plugin : IStellarPlugin
 {
     public string Name => "AutoFishing";
 
-    private const string HarmonyId = "stellar.auto-fishing-plugin";
-
     private readonly IPluginServices  _services;
     private readonly IConfigSection  _cfg;
     private readonly IWindowControl  _window;
@@ -25,10 +23,6 @@ public sealed partial class Plugin : IStellarPlugin
     private object?     _picInst;
     private MethodInfo? _picFishing;
     private bool        _fishingHeld;
-
-    // Lua direct call — LuaState.DoString(chunk)
-    private object?     _luaState;
-    private MethodInfo? _luaDoString;
 
     // UnityEngine.Time.deltaTime — cached for per-tick rod steering
     private PropertyInfo? _unityTimeDeltaTime;
@@ -46,9 +40,6 @@ public sealed partial class Plugin : IStellarPlugin
     // Stage 13 (FinishShowLoop) auto-continue
     private float _finishDelayTimer;
     private bool  _finishClicked;
-
-    // Offset of m_value in IL2CPP boxed primitive (resolved once from klass)
-    private int _luaBoxedValueOff = -1;
 
     private bool  _autoEnabled;
     private bool  _autoRodChange = true;
@@ -83,7 +74,9 @@ public sealed partial class Plugin : IStellarPlugin
                 DefaultRect: new WindowRect(_services.Framework.ScreenWidth - 300f, 20f, 280f, 0f),
                 Category:    WindowCategory.Tools,
                 Style:       WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false },
+            { Draggable = true, Closable = true, StartVisible = false,
+              // Gameplay tool: draw only while in-world (fishing happens in the World phase), hidden during loading screens.
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
             Root: new ColumnElement(new HudElement[]
             {
                 new ConditionalElement(
@@ -187,11 +180,13 @@ public sealed partial class Plugin : IStellarPlugin
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
-        { Group = LauncherGroup.Plugin });
+        { Group = LauncherGroup.Plugin,
+          // In-world tool: only surface the launcher tile in the World phase.
+          ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
 
         _services.ClientState.Login += OnLogin;
 
-        if (FishingTickPatch.Install(HarmonyId, OnFishingTick, _services.Log.Info))
+        if (FishingTickPatch.Install(_services.Harmony.Create(), OnFishingTick, _services.Log.Info))
             _services.Log.Info("[AutoFishing] PlayerFishingSystem.Tick hooked");
         else
             _services.Log.Warning("[AutoFishing] PlayerFishingSystem.Tick hook failed — will retry on login");
@@ -212,7 +207,7 @@ public sealed partial class Plugin : IStellarPlugin
 
         if (!FishingTickPatch.IsInstalled)
         {
-            if (FishingTickPatch.Install(HarmonyId, OnFishingTick, _services.Log.Info))
+            if (FishingTickPatch.Install(_services.Harmony.Create(), OnFishingTick, _services.Log.Info))
                 _services.Log.Info("[AutoFishing] PlayerFishingSystem.Tick hooked (deferred)");
             else
                 _services.Log.Warning("[AutoFishing] PlayerFishingSystem.Tick hook failed");
@@ -258,15 +253,5 @@ public sealed partial class Plugin : IStellarPlugin
             return ms.ToArray();
         }
         catch { return null; }
-    }
-
-    private static Type? FindType(string fullName)
-    {
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var t = asm.GetType(fullName);
-            if (t is not null) return t;
-        }
-        return null;
     }
 }
