@@ -11,6 +11,7 @@ public sealed partial class Plugin : IStellarPlugin
     public string Name => "AutoFishing";
 
     private readonly IPluginServices  _services;
+    private readonly ILocalization   _loc;
     private readonly IConfigSection  _cfg;
     private readonly IWindowControl  _window;
     private readonly IDisposable     _launcherEntry;
@@ -60,6 +61,7 @@ public sealed partial class Plugin : IStellarPlugin
     public Plugin(IPluginServices services)
     {
         _services = services;
+        _loc = services.Localization;
         _cfg = _services.Config.GetSection("settings");
         _autoRodChange       = _cfg.Get<bool> ("auto_rod_change",        true);
         _monthlyCardInterrupt = _cfg.Get<bool> ("monthly_card_interrupt", true);
@@ -70,7 +72,7 @@ public sealed partial class Plugin : IStellarPlugin
         _window = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id:          "auto-fishing.fishing",
-                Title:       "Fishing Automation",
+                Title:       _loc.T("af.window.title"),
                 DefaultRect: new WindowRect(_services.Framework.ScreenWidth - 300f, 20f, 280f, 0f),
                 Category:    WindowCategory.Tools,
                 Style:       WindowPanelStyle.GlassMenu)
@@ -82,26 +84,26 @@ public sealed partial class Plugin : IStellarPlugin
                 new ConditionalElement(
                     () => _autoEnabled,
                     new ButtonElement(
-                        Label:   () => "Stop",
+                        Label:   () => _loc.T("af.stop"),
                         OnClick: ToggleAuto,
                         Style:   MenuButtonStyle.Filled,
                         Width:   260f)),
                 new ConditionalElement(
                     () => !_autoEnabled,
                     new ButtonElement(
-                        Label:   () => "Start",
+                        Label:   () => _loc.T("af.start"),
                         OnClick: ToggleAuto,
                         Enabled: () => _fishing.IsFishing,
                         Width:   260f)),
                 new TextElement(
-                    () => _fishing.IsFishing ? " " : "Enter a fishing spot to start.",
+                    () => _fishing.IsFishing ? " " : _loc.T("af.enterSpot"),
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                 new SeparatorElement(),
                 new RowElement(new HudElement[]
                 {
-                    new CellElement(new TextElement(() => "Status", Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 65f),
+                    new CellElement(new TextElement(() => _loc.T("af.status"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 65f),
                     new CellElement(new TextElement(
-                        () => _autoEnabled ? StageLabel(_fishing.Stage) : "Stopped",
+                        () => _autoEnabled ? StageLabel(_fishing.Stage) : _loc.T("af.stopped"),
                         Emphasis: true,
                         FontSize: 14,
                         Color: () => _autoEnabled
@@ -110,17 +112,17 @@ public sealed partial class Plugin : IStellarPlugin
                     new SpacerElement(Height: 24f),
                 }, Gap: 8f),
                 new SeparatorElement(),
-                new TextElement(() => "Settings", Emphasis: true),
+                new TextElement(() => _loc.T("af.settings"), Emphasis: true),
                 new RowElement(new HudElement[]
                 {
                     new ToggleElement(
                         Label: () => "",
                         Get:   () => _autoRodChange,
                         Set:   v  => { _autoRodChange = v; _cfg.Set<bool>("auto_rod_change", v); _cfg.Save(); }),
-                    new TextElement(() => "Auto Rod Change"),
+                    new TextElement(() => _loc.T("af.autoRod")),
                 }, Gap: 6f),
                 new TextElement(
-                    () => "Auto-equip the best rod from bag. If off, automation waits until you equip one manually.",
+                    () => _loc.T("af.autoRod.hint"),
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                 new RowElement(new HudElement[]
                 {
@@ -128,16 +130,16 @@ public sealed partial class Plugin : IStellarPlugin
                         Label: () => "",
                         Get:   () => _monthlyCardInterrupt,
                         Set:   v  => { _monthlyCardInterrupt = v; _cfg.Set<bool>("monthly_card_interrupt", v); _cfg.Save(); }),
-                    new TextElement(() => "Monthly Card Interrupt"),
+                    new TextElement(() => _loc.T("af.monthlyCard")),
                 }, Gap: 6f),
                 new TextElement(
-                    () => "Auto-close the daily login card popup and resume fishing.",
+                    () => _loc.T("af.monthlyCard.hint"),
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                 new SeparatorElement(),
-                new TextElement(() => "Tension Control", Emphasis: true),
+                new TextElement(() => _loc.T("af.tension"), Emphasis: true),
                 new RowElement(new HudElement[]
                 {
-                    new CellElement(new TextElement(() => "Release at", Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
+                    new CellElement(new TextElement(() => _loc.T("af.tension.release"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
                     new CellElement(new SliderElement(
                         Get: () => _tensionHigh,
                         Set: v => { _tensionHigh = MathF.Max(v, _tensionLow + 1f); SaveTension(); },
@@ -146,7 +148,7 @@ public sealed partial class Plugin : IStellarPlugin
                 }, Gap: 6f),
                 new RowElement(new HudElement[]
                 {
-                    new CellElement(new TextElement(() => "Pull at", Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
+                    new CellElement(new TextElement(() => _loc.T("af.tension.pull"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
                     new CellElement(new SliderElement(
                         Get: () => _tensionLow,
                         Set: v => { _tensionLow = MathF.Min(v, _tensionHigh - 1f); SaveTension(); },
@@ -156,19 +158,19 @@ public sealed partial class Plugin : IStellarPlugin
                 new SeparatorElement(),
                 new RowElement(new HudElement[]
                 {
-                    new TextElement(() => "Caught",     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+                    new TextElement(() => _loc.T("af.caught"),     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                     new SpacerElement(Width: 0f),
                     new TextElement(() => $"{_fishCaught}"),
                 }, Gap: 8f),
                 new RowElement(new HudElement[]
                 {
-                    new TextElement(() => "Missed",     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+                    new TextElement(() => _loc.T("af.missed"),     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                     new SpacerElement(Width: 0f),
                     new TextElement(() => $"{_fishMissed}"),
                 }, Gap: 8f),
                 new RowElement(new HudElement[]
                 {
-                    new TextElement(() => "Rod Change", Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+                    new TextElement(() => _loc.T("af.rodChange"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
                     new SpacerElement(Width: 0f),
                     new TextElement(() => $"{_rodChanged}"),
                 }, Gap: 8f),
@@ -176,7 +178,7 @@ public sealed partial class Plugin : IStellarPlugin
             OnClose: () => { if (_autoEnabled) ToggleAuto(); _window!.SetVisible(false); }));
 
         _launcherEntry = _services.Launcher.Register(new LauncherEntry(
-            Title:   "Auto Fishing",
+            Title:   _loc.T("af.launcher.title"),
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
@@ -214,25 +216,25 @@ public sealed partial class Plugin : IStellarPlugin
         }
     }
 
-    private static string StageLabel(int stage) => stage switch
+    private string StageLabel(int stage) => stage switch
     {
-        0  => "Equipping rod",
-        1  => "Ready",
-        2  => "Casting",
-        3  => "Waiting for bite",
-        4  => "Hooking",
-        5  => "Harvesting",
-        6  => "Missed",
-        7  => "Cancelled",
-        8  => "Fish on!",
-        9  => "Reeling in",
-        10 => "Reeling in",
-        11 => "QTE done",
-        12 => "Catch preview",
-        13 => "Caught!",
-        14 => "Wrapping up",
-        15 => "Done",
-        _  => $"Stage {stage}",
+        0  => _loc.T("af.stage.equipping"),
+        1  => _loc.T("af.stage.ready"),
+        2  => _loc.T("af.stage.casting"),
+        3  => _loc.T("af.stage.waiting"),
+        4  => _loc.T("af.stage.hooking"),
+        5  => _loc.T("af.stage.harvesting"),
+        6  => _loc.T("af.stage.missed"),
+        7  => _loc.T("af.stage.cancelled"),
+        8  => _loc.T("af.stage.fishOn"),
+        9  => _loc.T("af.stage.reeling"),
+        10 => _loc.T("af.stage.reeling"),
+        11 => _loc.T("af.stage.qteDone"),
+        12 => _loc.T("af.stage.preview"),
+        13 => _loc.T("af.stage.caught"),
+        14 => _loc.T("af.stage.wrapping"),
+        15 => _loc.T("af.stage.done"),
+        _  => _loc.TFormat("af.stage.unknown", stage),
     };
 
     private void SaveTension()
