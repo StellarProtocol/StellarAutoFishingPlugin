@@ -10,17 +10,23 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Stellar.AutoFishing</RootNamespace>
     <AssemblyName>Stellar.AutoFishing</AssemblyName>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Deterministic>true</Deterministic>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="resources/fishing-icon.png" LogicalName="Stellar.AutoFishing.fishing-icon.png" />
+    <EmbeddedResource Include="Lang/en.json" LogicalName="Stellar.AutoFishing.Lang.en.json" />
+    <EmbeddedResource Include="Lang/ja.json" LogicalName="Stellar.AutoFishing.Lang.ja.json" />
+    <EmbeddedResource Include="Lang/th.json" LogicalName="Stellar.AutoFishing.Lang.th.json" />
+    <EmbeddedResource Include="Lang/id.json" LogicalName="Stellar.AutoFishing.Lang.id.json" />
+    <EmbeddedResource Include="Lang/fil.json" LogicalName="Stellar.AutoFishing.Lang.fil.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stellar.Abstractions"       Version="2.0.0" />
+    <!-- i18n P2: consumes IPluginServices.Localization (framework 2.1.0). -->
+    <PackageReference Include="Stellar.Abstractions"       Version="2.1.0" />
     <PackageReference Include="Stellar.PluginContracts"    Version="2.0.0" />
     <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.0.0" />
   </ItemGroup>
