@@ -177,13 +177,15 @@ public sealed partial class Plugin : IStellarPlugin
             }, Gap: 8f),
             OnClose: () => { if (_autoEnabled) ToggleAuto(); _window!.SetVisible(false); }));
 
+        // Title stays the fixed literal "Auto Fishing" — the stable pin-identity key (ILauncher.cs:49-50) —
+        // so a pinned tile survives a language change; TitleProvider carries the live-localized display.
         _launcherEntry = _services.Launcher.Register(new LauncherEntry(
-            Title:   _loc.T("af.launcher.title"),
+            Title:   "Auto Fishing",
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
         { Group = LauncherGroup.Plugin,
-          // Re-localize the tile title live on a language change (Title alone is a captured string).
+          // Re-localize the tile DISPLAY on a language change; Title above never changes (pin identity).
           TitleProvider = () => _loc.T("af.launcher.title"),
           // In-world tool: only surface the launcher tile in the World phase.
           ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
