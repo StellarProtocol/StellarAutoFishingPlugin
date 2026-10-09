@@ -3,7 +3,7 @@
   "af.autoRod.hint": "가방에서 가장 좋은 낚싯대를 자동으로 장착합니다. 끄면 직접 장착할 때까지 자동화가 대기합니다.",
   "af.caught": "포획",
   "af.enterSpot": "낚시터에 진입하면 시작됩니다.",
-  "af.launcher.title": "Auto Fishing",
+  "af.launcher.title": "자동 낚시",
   "af.missed": "놓침",
   "af.monthlyCard": "월간 카드 팝업 자동 닫기",
   "af.monthlyCard.hint": "일일 로그인 카드 팝업을 자동으로 닫고 낚시를 재개합니다.",
@@ -32,5 +32,5 @@
   "af.tension": "장력 조절",
   "af.tension.pull": "당기기 시점",
   "af.tension.release": "놓기 시점",
-  "af.window.title": "Auto Fishing"
+  "af.window.title": "자동 낚시"
 }
