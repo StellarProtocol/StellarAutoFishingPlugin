@@ -33,7 +33,7 @@ public sealed partial class Plugin
     // one pixel-hinted bitmap per size (house icon rule: never a master scaled down, Stellar-Design-Language.md §3), so
     // callers ask for the PIXEL size they will draw at. The launcher tile takes one PNG → the 128 drawing (the framework
     // scales its own tile, as Position / Wardrobe do).
-    private static readonly int[] IconSizes = { 12, 16, 24, 32, 40, 64, 128 };   // keep in sync with resources/icons
+    private static readonly int[] IconSizes = { 12, 16, 18, 24, 32, 40, 64, 128 };   // keep in sync with resources/icons
     private const int LauncherIconPx = 128;
 
     private static byte[]? PluginIconPng(int px) => CachedPng("autofishing-" + px + ".png");
