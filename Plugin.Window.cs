@@ -87,7 +87,7 @@ public sealed partial class Plugin
     // The text column sits in a weighted cell, so a long status ellipsizes instead of pushing the pill.
     private HudElement BuildHeader() => new RowElement(new HudElement[]
     {
-        IconBox(PluginIconPng, ToolIconSize, ToolGlyphSize),
+        IconBox(() => HeaderIconPng(ToolGlyphSize), ToolIconSize, ToolGlyphSize),
         new CellElement(new ColumnElement(new HudElement[]
         {
             new TextElement(() => "Auto Fishing", Color: () => TextColor(), Emphasis: true, NoWrap: true) { Ellipsize = true },

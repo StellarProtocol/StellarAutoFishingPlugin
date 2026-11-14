@@ -79,7 +79,7 @@ public sealed partial class Plugin : IStellarPlugin
         // so a pinned tile survives a language change; TitleProvider carries the live-localized display.
         _launcherEntry = _services.Launcher.Register(new LauncherEntry(
             Title:   "Auto Fishing",
-            IconPng: PluginIconPng(),   // same art as the header tile (Plugin.Style.Blocks.cs)
+            IconPng: PluginIconPng(LauncherIconPx),   // same art as the header tile (Plugin.Style.Blocks.cs)
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
         { Group = LauncherGroup.Plugin,

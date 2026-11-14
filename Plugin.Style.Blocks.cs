@@ -29,9 +29,34 @@ public sealed partial class Plugin
         return png;
     }
 
-    // The ONE place the plugin's icon art is chosen — the header tile and the launcher tile both read it, so swapping in
-    // the new icon (being drawn separately) is a one-line change here + the csproj EmbeddedResource.
-    private static byte[]? PluginIconPng() => CachedPng("fishing-icon.png");
+    // The ONE place the plugin's icon art is chosen — the header tile and the launcher tile both read it. Icon "A1" ships
+    // one pixel-hinted bitmap per size (house icon rule: never a master scaled down, Stellar-Design-Language.md §3), so
+    // callers ask for the PIXEL size they will draw at. The launcher tile takes one PNG → the 128 drawing (the framework
+    // scales its own tile, as Position / Wardrobe do).
+    private static readonly int[] IconSizes = { 12, 16, 24, 32, 40, 64, 128 };   // keep in sync with resources/icons
+    private const int LauncherIconPx = 128;
+
+    private static byte[]? PluginIconPng(int px) => CachedPng("autofishing-" + px + ".png");
+
+    // Header glyph: `units` canvas units × the live canvas→screen scale (1.0 at 1440p, 0.75 at 1080p). Same rule as the
+    // framework's IconSizePicker: an exact size (±0.05 px) draws 1:1, else the smallest LARGER drawing (downscaling stays
+    // crisper than blowing a smaller one up), else the largest. Cached until the scale changes, so the per-refresh Func is
+    // two property reads + a float compare and hands back the SAME array (ImageElement.Live compares by reference).
+    private float  _iconScale = -1f;
+    private byte[]? _iconPicked;
+
+    private byte[]? HeaderIconPng(int units)
+    {
+        var fw = _services.Framework;
+        float scale = fw.CanvasWidth > 1 && fw.ScreenWidth > 0 ? (float)fw.ScreenWidth / fw.CanvasWidth : 1f;
+        if (scale == _iconScale && _iconPicked != null) return _iconPicked;
+        _iconScale = scale;
+        float want = units * scale;
+        int px = IconSizes[IconSizes.Length - 1];
+        for (int i = 0; i < IconSizes.Length; i++)
+            if (IconSizes[i] >= want - 0.05f) { px = IconSizes[i]; break; }
+        return _iconPicked = PluginIconPng(px) ?? _iconPicked;
+    }
 
     // ── accent icon tile ──────────────────────────────────────────────────────────────────────────────────────────
     // A rounded tile in the LIVE theme accent with the flat white glyph centred (art can't follow the theme, so the colour
@@ -44,7 +69,8 @@ public sealed partial class Plugin
     {
         float pad = (size - glyph) / 2f;
         return new CellElement(new BubbleElement(
-            new RowElement(new HudElement[] { new ImageElement(png, glyph, glyph) }, Gap: 0.01f, Justify: RowJustify.Center))
+            // Live: re-pull per refresh so a resolution / UI-scale change swaps in the matching pre-drawn size.
+            new RowElement(new HudElement[] { new ImageElement(png, glyph, glyph) { Live = true } }, Gap: 0.01f, Justify: RowJustify.Center))
         {
             FillColorFn = () => Fade(AccentColor()), CornerRadius = MathF.Round(size * 0.22f), PaddingX = pad, PaddingY = pad,
         }, Width: size);
