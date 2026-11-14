@@ -220,9 +220,17 @@ public sealed partial class Plugin
         : MutedColor();
 
     // ── Start / Stop ──────────────────────────────────────────────────────────────────────────────────────────────
+    // A user press of Start opens a fresh session: the SESSION panel promises "since you pressed Start", so its counters
+    // and any leftover footer message reset here. Only the pill comes through this method — the monthly-card auto-resume
+    // (Plugin.Fishing.cs) re-enables automation directly, so a resume keeps the running session's counts.
     private void StartAuto()
     {
-        if (!_autoEnabled && _fishing.IsFishing) ToggleAuto();
+        if (_autoEnabled || !_fishing.IsFishing) return;
+        _fishCaught = 0;
+        _fishMissed = 0;
+        _rodChanged = 0;
+        _footerAt = float.NegativeInfinity;   // FooterShowing() false → idle line
+        ToggleAuto();                          // MarkDirty → the tiles redraw at 0
     }
 
     // Stop also cancels a pending monthly-card restart (Paused shows "Stop" too, and must not resume afterwards).
