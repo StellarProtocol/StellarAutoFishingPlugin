@@ -6,7 +6,7 @@
   "af.help.autoRod": "Memasang joran terbaik dari tas saat joranmu patah atau belum terpasang. Jika mati, memancing menunggu sampai kamu memasangnya sendiri.",
   "af.help.loginPopup": "Menutup popup kartu login harian dan hadiah saat muncul, lalu lanjut memancing sesaat kemudian.",
   "af.help.options.sub": "OPSI · BANTUAN",
-  "af.help.pull": "Saat tegangan turun ke nilai ini, joran ditahan lagi untuk terus menggulung. Harus di bawah Lepas pada. Bawaan 8%.",
+  "af.help.pull": "Saat tegangan turun ke nilai ini, joran ditahan lagi untuk terus menggulung. Harus di bawah Lepas di. Bawaan 8%.",
   "af.help.release": "Saat menggulung, joran dilepas ketika bar tegangan mencapai nilai ini agar senar tidak putus. Makin rendah makin aman tapi lebih lambat. Bawaan 25%.",
   "af.help.tension.sub": "TEGANGAN SENAR · BANTUAN",
   "af.help.title": "Bantuan",
