@@ -1,6 +1,6 @@
 {
   "af.caught": "Caught",
-  "af.footer.caught": "✓ Caught a fish · {0}",
+  "af.footer.caught": "Caught a fish · {0}",
   "af.footer.missed": "Missed the fish",
   "af.footer.rodBroke": "Rod broke · equipped a new one",
   "af.help.autoRod": "Equips the best rod from your bag when yours breaks or none is equipped. If off, fishing waits until you equip one yourself.",

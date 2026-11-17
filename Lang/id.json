@@ -1,6 +1,6 @@
 {
   "af.caught": "Tertangkap",
-  "af.footer.caught": "✓ Dapat ikan · {0}",
+  "af.footer.caught": "Dapat ikan · {0}",
   "af.footer.missed": "Ikannya lepas",
   "af.footer.rodBroke": "Joran patah · joran baru dipasang",
   "af.help.autoRod": "Memasang joran terbaik dari tas saat joranmu patah atau belum terpasang. Jika mati, memancing menunggu sampai kamu memasangnya sendiri.",
@@ -43,9 +43,9 @@
   "af.status.paused": "Dijeda",
   "af.status.pressStart": "tekan Mulai",
   "af.status.running": "Berjalan",
-  "af.stop": "Berhenti",
+  "af.stop": "Stop",
   "af.tension.pull": "Tarik pada",
-  "af.tension.release": "Lepas pada",
+  "af.tension.release": "Lepas di",
   "af.tile.rodsUsed": "Joran dipakai",
   "af.window.title": "Otomatisasi Memancing"
 }

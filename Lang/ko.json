@@ -1,6 +1,6 @@
 {
   "af.caught": "포획",
-  "af.footer.caught": "✓ 물고기를 낚았습니다 · {0}",
+  "af.footer.caught": "물고기를 낚았습니다 · {0}",
   "af.footer.missed": "물고기를 놓쳤습니다",
   "af.footer.rodBroke": "낚싯대 파손 · 새 낚싯대 장착",
   "af.help.autoRod": "낚싯대가 부러지거나 장착되어 있지 않으면 가방에서 가장 좋은 낚싯대를 장착합니다. 끄면 직접 장착할 때까지 낚시가 대기합니다.",

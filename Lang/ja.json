@@ -1,6 +1,6 @@
 {
   "af.caught": "釣獲",
-  "af.footer.caught": "✓ 魚を釣り上げた · {0}",
+  "af.footer.caught": "魚を釣り上げた · {0}",
   "af.footer.missed": "魚に逃げられた",
   "af.footer.rodBroke": "ロッドが壊れた · 新しいロッドを装備",
   "af.help.autoRod": "ロッドが壊れたときや未装備のときに、バッグから最良のロッドを装備します。オフの場合は、自分で装備するまで釣りを待機します。",

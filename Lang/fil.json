@@ -1,6 +1,6 @@
 {
   "af.caught": "Nahuli",
-  "af.footer.caught": "✓ May nahuling isda · {0}",
+  "af.footer.caught": "May nahuling isda · {0}",
   "af.footer.missed": "Nakawala ang isda",
   "af.footer.rodBroke": "Nasira ang baras · nagsuot ng bago",
   "af.help.autoRod": "Isinusuot ang pinakamahusay na baras mula sa bag kapag nasira ang sa iyo o wala kang suot. Kapag naka-off, maghihintay ang pangingisda hanggang ikaw mismo ang magsuot.",
@@ -10,7 +10,7 @@
   "af.help.release": "Habang hinihila, binibitawan ang baras kapag umabot ang tension bar sa halagang ito para hindi maputol ang linya. Mas mababa, mas ligtas pero mas mabagal. Default 25%.",
   "af.help.tension.sub": "TENSYON NG REEL · TULONG",
   "af.help.title": "Tulong",
-  "af.launcher.title": "Awtomatikong Pangingisda",
+  "af.launcher.title": "Auto Pangingisda",
   "af.missed": "Napalya",
   "af.off": "Sarado",
   "af.on": "Bukas",
