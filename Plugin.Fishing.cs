@@ -90,7 +90,9 @@ public sealed partial class Plugin
     private void OnFishingTick(FishingState s)
     {
         _fishing = s;
-        _window.MarkDirty();
+        // No MarkDirty here: this hook runs every frame, and an immediate window apply per frame is exactly the per-frame
+        // UI churn Plugin-Performance-Rules §5 forbids. The framework's 10 Hz scheduled refresh picks the new state up;
+        // discrete events (start / stop / pause) still MarkDirty.
         ++_tickCount;
 
         if (!s.IsFishing)
@@ -132,6 +134,7 @@ public sealed partial class Plugin
             if (wasActive && (s.Stage == 0 || s.Stage == 1))
             {
                 _fishMissed++;
+                ShowFooter(FooterKind.Missed);   // footer feedback (Plugin.Window.cs)
                 _window.MarkDirty();
             }
 
@@ -213,6 +216,7 @@ public sealed partial class Plugin
 
             case 13: // FinishShowLoop — result window open; reset timer for auto-continue
                 _fishCaught++;
+                ShowFooter(FooterKind.Caught, _fishCaught);
                 _finishDelayTimer = 0f;
                 _finishClicked    = false;
                 break;
@@ -226,7 +230,6 @@ public sealed partial class Plugin
         {
             _services.Lua.DoString("pcall(function() local fd=Z.DataMgr.Get('fishing_data') local r=fd and fd.FishingRod local has=(r~=nil and r~=0 and r~='') and true or nil rawset(_G,'_pf_hasrod',has) end)");
             _rodEquipped = _services.Lua.TryReadGlobalBool("_pf_hasrod", out var hasRod) && hasRod;
-            _window.MarkDirty();
         }
 
         switch (s.Stage)
@@ -243,6 +246,7 @@ public sealed partial class Plugin
                 {
                     _rodUseFired = true;
                     _rodChanged++;
+                    ShowFooter(FooterKind.RodBroke);
                     // E.BackPackItemPackageType.Item=1, E.FishingItemType.FishingRod=1103 (plain Lua numbers).
                     // Access Z.ContainerMgr.CharSerialize.itemPackage.packages[1] directly —
                     // avoid nested pcalls which return IL2CPP booleans (always truthy in Lua).

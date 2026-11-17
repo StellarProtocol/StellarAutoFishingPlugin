@@ -10,13 +10,16 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Stellar.AutoFishing</RootNamespace>
     <AssemblyName>Stellar.AutoFishing</AssemblyName>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <Deterministic>true</Deterministic>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="resources/fishing-icon.png" LogicalName="Stellar.AutoFishing.fishing-icon.png" />
+    <!-- Icon "A1" (fish + line + hook) is pre-drawn per size (house rule: never one master scaled down); the code picks the
+         exact bitmap (Plugin.Style.Blocks.cs PluginIconPng). The SVG sources under resources/icons/src are kept for
+         redraws and are NOT embedded. -->
+    <EmbeddedResource Include="resources/icons/autofishing-*.png" LogicalName="Stellar.AutoFishing.%(Filename).png" />
     <EmbeddedResource Include="Lang/en.json" LogicalName="Stellar.AutoFishing.Lang.en.json" />
     <EmbeddedResource Include="Lang/ja.json" LogicalName="Stellar.AutoFishing.Lang.ja.json" />
     <EmbeddedResource Include="Lang/th.json" LogicalName="Stellar.AutoFishing.Lang.th.json" />
@@ -26,10 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- i18n P2: consumes IPluginServices.Localization (framework 2.1.0). -->
-    <PackageReference Include="Stellar.Abstractions" Version="2.3.0" />
-    <PackageReference Include="Stellar.PluginContracts" Version="2.0.0" />
-    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.0.0" />
+    <!-- Localization (fw 2.1.0+) and the house-style UI kit theme status colours (fw 2.30.0). -->
+    <PackageReference Include="Stellar.Abstractions"       Version="2.30.0" />
+    <PackageReference Include="Stellar.PluginContracts"    Version="2.30.0" />
+    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.30.0" />
   </ItemGroup>
 
   <ItemGroup>

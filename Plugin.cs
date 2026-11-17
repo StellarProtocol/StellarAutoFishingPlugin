@@ -69,119 +69,19 @@ public sealed partial class Plugin : IStellarPlugin
         _tensionLow           = _cfg.Get<float>("tension_low",            8f);
         _services.Log.Info("[AutoFishing] constructed");
 
-        _window = _services.Windows.Register(new WindowRegistration(
-            Spec: new WindowSpec(
-                Id:          "auto-fishing.fishing",
-                Title:       _loc.T("af.window.title"),
-                DefaultRect: new WindowRect(_services.Framework.ScreenWidth - 300f, 20f, 280f, 0f),
-                Category:    WindowCategory.Tools,
-                Style:       WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false,
-              // Gameplay tool: draw only while in-world (fishing happens in the World phase), hidden during loading screens.
-              ShouldRender = () => _services.ClientState.Phase == GamePhase.World && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
-            Root: new ColumnElement(new HudElement[]
-            {
-                new ConditionalElement(
-                    () => _autoEnabled,
-                    new ButtonElement(
-                        Label:   () => _loc.T("af.stop"),
-                        OnClick: ToggleAuto,
-                        Style:   MenuButtonStyle.Filled,
-                        Width:   260f)),
-                new ConditionalElement(
-                    () => !_autoEnabled,
-                    new ButtonElement(
-                        Label:   () => _loc.T("af.start"),
-                        OnClick: ToggleAuto,
-                        Enabled: () => _fishing.IsFishing,
-                        Width:   260f)),
-                new TextElement(
-                    () => _fishing.IsFishing ? " " : _loc.T("af.enterSpot"),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                new SeparatorElement(),
-                new RowElement(new HudElement[]
-                {
-                    new CellElement(new TextElement(() => _loc.T("af.status"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 65f),
-                    new CellElement(new TextElement(
-                        () => _autoEnabled ? StageLabel(_fishing.Stage) : _loc.T("af.stopped"),
-                        Emphasis: true,
-                        FontSize: 14,
-                        Color: () => _autoEnabled
-                            ? new ColorRgba(0.2f, 0.85f, 0.2f, 1f)
-                            : new ColorRgba(0.9f, 0.2f, 0.2f, 1f)), Weight: 1f),
-                    new SpacerElement(Height: 24f),
-                }, Gap: 8f),
-                new SeparatorElement(),
-                new TextElement(() => _loc.T("af.settings"), Emphasis: true),
-                new RowElement(new HudElement[]
-                {
-                    new ToggleElement(
-                        Label: () => "",
-                        Get:   () => _autoRodChange,
-                        Set:   v  => { _autoRodChange = v; _cfg.Set<bool>("auto_rod_change", v); _cfg.Save(); }),
-                    new TextElement(() => _loc.T("af.autoRod")),
-                }, Gap: 6f),
-                new TextElement(
-                    () => _loc.T("af.autoRod.hint"),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                new RowElement(new HudElement[]
-                {
-                    new ToggleElement(
-                        Label: () => "",
-                        Get:   () => _monthlyCardInterrupt,
-                        Set:   v  => { _monthlyCardInterrupt = v; _cfg.Set<bool>("monthly_card_interrupt", v); _cfg.Save(); }),
-                    new TextElement(() => _loc.T("af.monthlyCard")),
-                }, Gap: 6f),
-                new TextElement(
-                    () => _loc.T("af.monthlyCard.hint"),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                new SeparatorElement(),
-                new TextElement(() => _loc.T("af.tension"), Emphasis: true),
-                new RowElement(new HudElement[]
-                {
-                    new CellElement(new TextElement(() => _loc.T("af.tension.release"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
-                    new CellElement(new SliderElement(
-                        Get: () => _tensionHigh,
-                        Set: v => { _tensionHigh = MathF.Max(v, _tensionLow + 1f); SaveTension(); },
-                        Min: 0f, Max: 100f), Weight: 1f),
-                    new CellElement(new TextElement(() => $"{_tensionHigh:F0}%"), Width: 36f),
-                }, Gap: 6f),
-                new RowElement(new HudElement[]
-                {
-                    new CellElement(new TextElement(() => _loc.T("af.tension.pull"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 80f),
-                    new CellElement(new SliderElement(
-                        Get: () => _tensionLow,
-                        Set: v => { _tensionLow = MathF.Min(v, _tensionHigh - 1f); SaveTension(); },
-                        Min: 0f, Max: 100f), Weight: 1f),
-                    new CellElement(new TextElement(() => $"{_tensionLow:F0}%"), Width: 36f),
-                }, Gap: 6f),
-                new SeparatorElement(),
-                new RowElement(new HudElement[]
-                {
-                    new TextElement(() => _loc.T("af.caught"),     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                    new SpacerElement(Width: 0f),
-                    new TextElement(() => $"{_fishCaught}"),
-                }, Gap: 8f),
-                new RowElement(new HudElement[]
-                {
-                    new TextElement(() => _loc.T("af.missed"),     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                    new SpacerElement(Width: 0f),
-                    new TextElement(() => $"{_fishMissed}"),
-                }, Gap: 8f),
-                new RowElement(new HudElement[]
-                {
-                    new TextElement(() => _loc.T("af.rodChange"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-                    new SpacerElement(Width: 0f),
-                    new TextElement(() => $"{_rodChanged}"),
-                }, Gap: 8f),
-            }, Gap: 8f),
-            OnClose: () => { if (_autoEnabled) ToggleAuto(); _window!.SetVisible(false); }));
+        // Help popover first, so the main window's "?" Funcs always have it (Plugin.Help.cs); then the main window
+        // (Plugin.Window.cs).
+        _helpWindow = RegisterHelpWindow();
+        _window = RegisterMainWindow();
+        _services.Framework.Update += OnUpdate;
+        // Live language switch: rebuild the cached composed strings (Plugin.Loc.cs). After both windows exist.
+        _loc.LanguageChanged += OnLanguageChanged;
 
         // Title stays the fixed literal "Auto Fishing" — the stable pin-identity key (ILauncher.cs:49-50) —
         // so a pinned tile survives a language change; TitleProvider carries the live-localized display.
         _launcherEntry = _services.Launcher.Register(new LauncherEntry(
             Title:   "Auto Fishing",
-            IconPng: LoadIconPng(),
+            IconPng: PluginIconPng(LauncherIconPx),   // same art as the header tile (Plugin.Style.Blocks.cs)
             IconKey: null,
             OnOpen:  () => _window.SetVisible(true))
         { Group = LauncherGroup.Plugin,
@@ -203,7 +103,11 @@ public sealed partial class Plugin : IStellarPlugin
         ReleaseFishing();
         FishingTickPatch.Uninstall();
         _services.ClientState.Login -= OnLogin;
+        _services.Framework.Update -= OnUpdate;
+        _loc.LanguageChanged -= OnLanguageChanged;
+        if (_tensionSavePending) { _tensionSavePending = false; SaveTension(); }   // flush a debounced slider save
         _launcherEntry.Dispose();
+        _helpWindow.Remove();
         _window.Remove();
     }
 
@@ -246,18 +150,5 @@ public sealed partial class Plugin : IStellarPlugin
         _cfg.Set<float>("tension_high", _tensionHigh);
         _cfg.Set<float>("tension_low",  _tensionLow);
         _cfg.Save();
-    }
-
-    private static byte[]? LoadIconPng()
-    {
-        try
-        {
-            using var s = typeof(Plugin).Assembly.GetManifestResourceStream("Stellar.AutoFishing.fishing-icon.png");
-            if (s == null) return null;
-            using var ms = new System.IO.MemoryStream();
-            s.CopyTo(ms);
-            return ms.ToArray();
-        }
-        catch { return null; }
     }
 }
