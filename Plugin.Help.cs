@@ -10,9 +10,10 @@ namespace Stellar.AutoFishing;
 /// tip is open) that opens ONE shared, title-bar-less GlassMenu popover anchored under it:
 ///   [32 px accent tile with a white bold "?"] [bold setting name / muted "SECTION · HELP"] … [round ✕]
 ///   then the help text in one Tile box, 360 wide.
-/// Each "?" passes its title / body / subtitle; the popover's text Funcs read whichever set is current, so clicking
-/// another "?" while open swaps the text and re-anchors it. Re-clicking the open "?" closes it. All texts are constant
-/// literals (the plugin is English-only) → compared by reference, no allocation per refresh.
+/// Each "?" passes its title / body / subtitle as CATALOG KEYS; the popover's text Funcs resolve whichever set is current
+/// through _loc.T (so an open tip follows a live language switch), and clicking another "?" while open swaps the text and
+/// re-anchors it. Re-clicking the open "?" closes it. The keys are const strings → compared by reference, no allocation
+/// per refresh.
 /// </summary>
 public sealed partial class Plugin
 {
@@ -24,8 +25,8 @@ public sealed partial class Plugin
     private WindowRect _helpRect;                  // where the popover should sit (re-applied for a few ticks after opening)
     private int _helpRepositionTicks;
     private readonly HoverFlag _helpCloseHover = new();
-    // The open tip's texts ("" body = closed).
-    private string _helpTitle = string.Empty, _helpBody = string.Empty, _helpSubtitle = string.Empty;
+    // The open tip's catalog keys ("" body = closed).
+    private string _helpTitleKey = string.Empty, _helpBodyKey = string.Empty, _helpSubtitleKey = string.Empty;
 
     // Content = [24 px strut, the "?" in a 24 px box] side by side in ONE Row, so the circle is exactly its side (a
     // stacked spacer drew Maestro's "?" 24 × 26). CenterGlyphs centres the drawn "?" in its box.
@@ -48,7 +49,7 @@ public sealed partial class Plugin
             })
         {
             // Accent-tinted only while THIS dot's tip is the one open.
-            FillColorFn = () => Fade(_helpWindow.IsShown && ReferenceEquals(_helpBody, body)
+            FillColorFn = () => Fade(_helpWindow.IsShown && ReferenceEquals(_helpBodyKey, body)
                                      ? Over(AccentColor() with { A = 0.35f }, NeutralFill())
                                      : hover.On ? HoverFill(NeutralFill())
                                      : NeutralFill()),
@@ -67,6 +68,8 @@ public sealed partial class Plugin
             Draggable = true, Closable = true, StartVisible = false,
             // No title bar: the header carries the title and a close; the whole frame is the drag handle.
             ShowTitleBar = false,
+            // Not drawn (no title bar), but the Settings layout editor lists the window by its live-localized title.
+            TitleProvider = () => _loc.T("af.help.title"),
             // Help for the in-world Auto Fishing window — only while in the world and not on a loading screen.
             ShouldRender = () => _services.ClientState.Phase == GamePhase.World
                                  && (_services.ClientState.UiState & GameUIState.Loading) == 0,
@@ -81,13 +84,13 @@ public sealed partial class Plugin
             HelpIcon(),
             new CellElement(new ColumnElement(new HudElement[]
             {
-                new TextElement(() => _helpTitle, Color: () => TextColor(), NoWrap: true, FontSize: 14) { Bold = true, Ellipsize = true },
-                new TextElement(() => _helpSubtitle, Color: () => MutedColor(), NoWrap: true, FontSize: 11) { Bold = true, Ellipsize = true },
+                new TextElement(() => HelpText(_helpTitleKey), Color: () => TextColor(), NoWrap: true, FontSize: 14) { Bold = true, Ellipsize = true },
+                new TextElement(() => HelpText(_helpSubtitleKey), Color: () => MutedColor(), NoWrap: true, FontSize: 11) { Bold = true, Ellipsize = true },
             }, Gap: 1f), Weight: 1f),
             HelpCloseButton(),
         }, Gap: 10f),
         // The help text: one raised tile (house Tile colour, theme-live), wrapping inside the 360 px popover.
-        new BubbleElement(new TextElement(() => _helpBody, Color: () => TextColor()))
+        new BubbleElement(new TextElement(() => HelpText(_helpBodyKey), Color: () => TextColor()))
         {
             FillColorFn = () => Fade(TileColor()), CornerRadius = TileRadius, PaddingX = 10f, PaddingY = 8f,
         },
@@ -126,10 +129,10 @@ public sealed partial class Plugin
     // anchored under the "?" that was clicked.
     private void ToggleHelp(WindowRect r, string title, string body, string subtitle)
     {
-        if (_helpWindow.IsShown && ReferenceEquals(_helpBody, body)) { CloseHelp(); return; }
-        _helpTitle = title;
-        _helpBody = body;
-        _helpSubtitle = subtitle;
+        if (_helpWindow.IsShown && ReferenceEquals(_helpBodyKey, body)) { CloseHelp(); return; }
+        _helpTitleKey = title;
+        _helpBodyKey = body;
+        _helpSubtitleKey = subtitle;
         // OnClickWithRect reports SCREEN PIXELS; SetRect takes CANVAS units — scale first, or the tip drifts off its
         // "?" whenever the UI scale isn't 1 (WindowBuilder-Patterns.md, click-to-open tooltip).
         var fw = _services.Framework;
@@ -151,10 +154,13 @@ public sealed partial class Plugin
         _helpRepositionTicks = 4;
     }
 
+    // "" key (nothing opened yet / closed) → blank, without asking the catalog for an empty key.
+    private string HelpText(string key) => key.Length == 0 ? string.Empty : _loc.T(key);
+
     private void CloseHelp()
     {
         _helpRepositionTicks = 0;
-        _helpBody = string.Empty;
+        _helpBodyKey = string.Empty;
         if (_helpWindow.IsShown) _helpWindow.SetVisible(false);
     }
 

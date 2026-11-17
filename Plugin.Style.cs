@@ -214,17 +214,19 @@ public sealed partial class Plugin
     // ── section panel ─────────────────────────────────────────────────────────────────────────────────────────────
     // A rounded panel (background darkened, live): bold 12 UPPERCASE caption (text colour, like the prototype) + a
     // right-aligned muted 12 px hint, then the children. Directly in a Column it FILLS the width (a Bubble only hugs
-    // inside a Row). Captions here are constant English literals, so they are upper-cased once at build time.
+    // inside a Row). `captionKey` / `hintKey` are catalog keys (null hint = none); the caption is upper-cased once per
+    // language (UpperLoc, Plugin.Loc.cs), not per refresh.
     // ⚠️ ONE method with an explicit HudElement[] — deliberately NOT a `params` overload pair: with two params overloads
     // C# binds the first child as a trailing control (KB Stellar-Design-Language §4).
-    private HudElement SectionPanel(string caption, string hint, HudElement[] children)
+    private HudElement SectionPanel(string captionKey, string? hintKey, HudElement[] children)
     {
-        string cap = caption.ToUpperInvariant();
+        Func<string> cap = UpperLoc(captionKey);
+        Func<string> hint = hintKey == null ? () => string.Empty : () => _loc.T(hintKey);
         var items = new HudElement[children.Length + 1];
         items[0] = new RowElement(new HudElement[]
         {
-            new TextElement(() => cap, Color: () => TextColor(), NoWrap: true, FontSize: 12) { Bold = true },
-            new CellElement(new TextElement(() => hint, Color: () => MutedColor(), Align: TextAlign.Right, NoWrap: true,
+            new TextElement(cap, Color: () => TextColor(), NoWrap: true, FontSize: 12) { Bold = true },
+            new CellElement(new TextElement(hint, Color: () => MutedColor(), Align: TextAlign.Right, NoWrap: true,
                 FontSize: 12) { RichEmoji = true, Ellipsize = true }, Weight: 1f),
         }, Gap: 6f);
         Array.Copy(children, 0, items, 1, children.Length);

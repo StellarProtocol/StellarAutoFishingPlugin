@@ -74,6 +74,8 @@ public sealed partial class Plugin : IStellarPlugin
         _helpWindow = RegisterHelpWindow();
         _window = RegisterMainWindow();
         _services.Framework.Update += OnUpdate;
+        // Live language switch: rebuild the cached composed strings (Plugin.Loc.cs). After both windows exist.
+        _loc.LanguageChanged += OnLanguageChanged;
 
         // Title stays the fixed literal "Auto Fishing" — the stable pin-identity key (ILauncher.cs:49-50) —
         // so a pinned tile survives a language change; TitleProvider carries the live-localized display.
@@ -102,6 +104,7 @@ public sealed partial class Plugin : IStellarPlugin
         FishingTickPatch.Uninstall();
         _services.ClientState.Login -= OnLogin;
         _services.Framework.Update -= OnUpdate;
+        _loc.LanguageChanged -= OnLanguageChanged;
         if (_tensionSavePending) { _tensionSavePending = false; SaveTension(); }   // flush a debounced slider save
         _launcherEntry.Dispose();
         _helpWindow.Remove();

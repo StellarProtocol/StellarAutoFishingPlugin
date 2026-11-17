@@ -107,11 +107,13 @@ public sealed partial class Plugin
         ColorRgba OnFill()  => Over(SuccessColor() with { A = ChipWashAlpha }, PanelColor());
         ColorRgba OffFill() => Over(TextColor() with { A = OffChipTextMix }, PanelColor());
         return new CellElement(new ConditionalElement(get,
-            ChipShell(DropBold(new TextElement(() => "On", Color: () => onText.Get(SuccessColor(), OnFill(), SolidMinContrast),
-                    Width: OnOffChipW, Align: TextAlign.Center, NoWrap: true, FontSize: 13) { Bold = true }),
+            // Localized On/Off: the label box is the whole 64 px chip, and Ellipsize keeps a long translation inside it
+            // (the chip size never changes with the language).
+            ChipShell(DropBold(new TextElement(() => _loc.T("af.on"), Color: () => onText.Get(SuccessColor(), OnFill(), SolidMinContrast),
+                    Width: OnOffChipW, Align: TextAlign.Center, NoWrap: true, FontSize: 13) { Bold = true, Ellipsize = true }),
                 OnFill, hover, Click, OnOffChipW),
-            ChipShell(new TextElement(() => "Off", Color: () => MutedColor(),
-                    Width: OnOffChipW, Align: TextAlign.Center, NoWrap: true),
+            ChipShell(new TextElement(() => _loc.T("af.off"), Color: () => MutedColor(),
+                    Width: OnOffChipW, Align: TextAlign.Center, NoWrap: true) { Ellipsize = true },
                 OffFill, hover, Click, OnOffChipW)), Width: OnOffChipW);
     }
 
@@ -130,7 +132,8 @@ public sealed partial class Plugin
     private const float StatTileH     = 46f;
     private const float StatTextW     = 76f;
 
-    private HudElement StatTile(Func<string> number, Func<ColorRgba> numberColor, string label)
+    // `labelKey` is a catalog key; the label ellipsizes inside its fixed box so a long translation can't widen a tile.
+    private HudElement StatTile(Func<string> number, Func<ColorRgba> numberColor, string labelKey)
         => new BubbleElement(new RowElement(new HudElement[]
         {
             new SpacerElement(0f, StatTileH),
@@ -138,8 +141,8 @@ public sealed partial class Plugin
             {
                 new TextElement(number, Color: () => numberColor(), Width: StatTextW, Align: TextAlign.Center,
                     NoWrap: true, FontSize: 17) { Bold = true },
-                new TextElement(() => label, Color: () => MutedColor(), Width: StatTextW, Align: TextAlign.Center,
-                    NoWrap: true, FontSize: 11) { RichEmoji = true },
+                new TextElement(() => _loc.T(labelKey), Color: () => MutedColor(), Width: StatTextW, Align: TextAlign.Center,
+                    NoWrap: true, FontSize: 11) { RichEmoji = true, Ellipsize = true },
             }, Gap: 0.01f),
         }, Gap: 0.01f, Justify: RowJustify.Center))
         {

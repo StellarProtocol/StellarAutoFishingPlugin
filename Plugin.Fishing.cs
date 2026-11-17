@@ -134,7 +134,7 @@ public sealed partial class Plugin
             if (wasActive && (s.Stage == 0 || s.Stage == 1))
             {
                 _fishMissed++;
-                ShowFooter("Missed the fish", green: false);   // footer feedback (Plugin.Window.cs)
+                ShowFooter(FooterKind.Missed);   // footer feedback (Plugin.Window.cs)
                 _window.MarkDirty();
             }
 
@@ -216,7 +216,7 @@ public sealed partial class Plugin
 
             case 13: // FinishShowLoop — result window open; reset timer for auto-continue
                 _fishCaught++;
-                ShowFooter("✓ Caught a fish · " + _fishCaught, green: true);
+                ShowFooter(FooterKind.Caught, _fishCaught);
                 _finishDelayTimer = 0f;
                 _finishClicked    = false;
                 break;
@@ -246,7 +246,7 @@ public sealed partial class Plugin
                 {
                     _rodUseFired = true;
                     _rodChanged++;
-                    ShowFooter("Rod broke · equipped a new one", green: false);
+                    ShowFooter(FooterKind.RodBroke);
                     // E.BackPackItemPackageType.Item=1, E.FishingItemType.FishingRod=1103 (plain Lua numbers).
                     // Access Z.ContainerMgr.CharSerialize.itemPackage.packages[1] directly —
                     // avoid nested pcalls which return IL2CPP booleans (always truthy in Lua).
