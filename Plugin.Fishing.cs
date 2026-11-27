@@ -166,7 +166,21 @@ public sealed partial class Plugin
         ReleaseFishing();
         _autoEnabled = false;
         _prevStage = -1;
-        _services.Lua.DoString("pcall(function() if (Z.UIMgr):IsActive('monthly_reward_card_window') then (Z.UIMgr):CloseView('monthly_reward_card_window') end if (Z.UIMgr):IsActive('com_rewards_window') then (Z.UIMgr):CloseView('com_rewards_window') end end)");
+        // The monthly card reward is already server-granted; the popup is display-only. But closing it without "Get"
+        // never sends the server's "seen" ack (tipsClicked stays CanShow), so it re-appeared every login. Fire the
+        // same ack the Get button does (vm:AsyncClickMonthlyCardTips, in a coroutine like the game's own VM code;
+        // ignoreError=true → no error toast) — monthly card window only, once per detection. ⚠️ The ';' before
+        // (Z.UIMgr) is load-bearing: without it Lua parses "end) (Z.UIMgr)" as a call on pcall's result.
+        _services.Lua.DoString("pcall(function() " +
+            "if (Z.UIMgr):IsActive('monthly_reward_card_window') then " +
+                "pcall(function() local vm=Z.VMMgr.GetVM('monthly_reward_card') " +
+                    "if vm and vm.AsyncClickMonthlyCardTips then Z.CoroUtil.create_coro_xpcall(function() " +
+                        "local cs=Z.CancelSource.Rent() vm:AsyncClickMonthlyCardTips(cs:CreateToken(),true) cs:Recycle() " +
+                    "end)() end end) " +
+                ";(Z.UIMgr):CloseView('monthly_reward_card_window') " +
+            "end " +
+            "if (Z.UIMgr):IsActive('com_rewards_window') then (Z.UIMgr):CloseView('com_rewards_window') end " +
+        "end)");
         _monthlyRestartPending = true;
         _monthlyRestartTimer = 0f;
         _window.MarkDirty();
